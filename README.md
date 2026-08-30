@@ -6,8 +6,6 @@ FraudLens is an AI-powered scam and phishing detection web application. Users pa
 
 ---
 
-## 🚀 Tech Stack
-
 ## 🛠️ Tech Stack
 
 ![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)

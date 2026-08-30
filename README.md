@@ -5,6 +5,10 @@
 FraudLens is an AI-powered scam and phishing detection web application. Users paste suspicious messages (SMS, WhatsApp, email, or UPI payment text) and receive an explainable risk diagnostic report featuring calibrated threat scores, detected red flags, plain-English explanations, and two-column safety action playbooks (DO NOT vs DO).
 
 ---
+### 🌐 Live Website
+[SafeVerify](https://safeverify-frontend.vercel.app/)
+
+---
 
 ## 🛠️ Tech Stack
 

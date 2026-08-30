@@ -101,48 +101,107 @@ src/
 ```
 
 ---
-
 ## 🔌 API Contract & Backend Integration
 
-The frontend communicates with the backend via [`src/api.js`](file:///c:/Users/anupr/safeverify/src/api.js).
+The frontend communicates with the backend via [`src/api.js`](src/api.js).
 
-### Endpoints Covered:
-1. **`POST /api/analyze`**
-   - Request: `{ "text": "<pasted message>" }`
-   - Response:
-     ```json
-     {
-       "risk_score": 95,
-       "risk_level": "CRITICAL",
-       "scam_type": "Banking Phishing",
-       "red_flags": [
-         "Urgent threat of account suspension within 24 hours",
-         "Shortened suspicious URL (bit.ly)",
-         "Unsolicited request for sensitive PAN and banking credentials"
-       ],
-       "explanation": "This message uses urgent psychological pressure and fake account suspension threats...",
-       "safety_actions": {
-         "do_not": ["Do not click on the link or download any attachments"],
-         "do": ["Log into your official banking mobile app directly"]
-       },
-       "source": "llm"
-     }
-     ```
+### Endpoint Summary
 
-2. **`GET /api/history?limit=20`**
-   - Response: Array of historical scan objects (`_id`, `text`, `risk_score`, `risk_level`, `scam_type`, `created_at`).
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/analyze` | Submits message text for AI-powered scam risk analysis |
+| `GET` | `/api/history?limit=20` | Retrieves recent scan history, newest first |
+| `GET` | `/api/stats` | Retrieves aggregate scan statistics |
 
-3. **`GET /api/stats`**
-   - Response: `{ "total_scans": int, "high_risk": int, "top_category": string|null }`
-
-### Connecting to the Live Flask Backend:
-Create a `.env` file in the root directory:
-```env
-VITE_API_URL=https://your-flask-backend.onrender.com
-```
-When `VITE_API_URL` is set, `src/api.js` will automatically direct requests to the live backend endpoints. If unset or offline, it seamlessly falls back to the built-in intelligent mock engine.
+All requests/responses use `Content-Type: application/json`.
 
 ---
+
+### `POST /api/analyze`
+
+**Request body:**
+```json
+{ "text": "<pasted message>" }
+```
+
+**Success response — `200 OK`:**
+```json
+{
+  "risk_score": 95,
+  "risk_level": "CRITICAL",
+  "scam_type": "Banking Phishing",
+  "red_flags": [
+    "Urgent threat of account suspension within 24 hours",
+    "Shortened suspicious URL (bit.ly)",
+    "Unsolicited request for sensitive PAN and banking credentials"
+  ],
+  "explanation": "This message uses urgent psychological pressure and fake account suspension threats...",
+  "safety_actions": {
+    "do_not": ["Do not click on the link or download any attachments"],
+    "do": ["Log into your official banking mobile app directly"]
+  },
+  "source": "llm"
+}
+```
+
+> `source` will be `"llm"` when Gemini successfully analyzed the message, or `"rules_fallback"` if Gemini was unavailable and the backend's offline rule-based engine handled it instead — the response shape stays identical either way, so the frontend doesn't need to handle these cases differently.
+
+**Error responses:**
+
+| Status | Condition | Body |
+|---|---|---|
+| `400` | `text` field missing from request body | `{ "error": "Missing 'text' in request body" }` |
+| `400` | `text` field is empty/whitespace-only | `{ "error": "Text cannot be empty" }` |
+| `500` | Unexpected server-side failure | `{ "error": "Internal server error" }` |
+
+---
+
+### `GET /api/history?limit=20`
+
+Optional query parameter `limit` (integer, default `20`) caps the number of results returned.
+
+**Success response — `200 OK`:**
+```json
+[
+  {
+    "_id": "665f1a2b3c4d5e6f7a8b9c0d",
+    "text": "URGENT: Your bank account is suspended...",
+    "risk_score": 95,
+    "risk_level": "CRITICAL",
+    "scam_type": "Banking Phishing",
+    "created_at": "2026-08-30T12:34:56.000Z"
+  }
+]
+```
+
+Returns an empty array (`[]`) if the database is unavailable, rather than an error — the UI can render an empty state safely.
+
+---
+
+### `GET /api/stats`
+
+**Success response — `200 OK`:**
+```json
+{
+  "total_scans": 142,
+  "high_risk": 37,
+  "top_category": "Banking Phishing"
+}
+```
+
+`top_category` is `null` if there isn't enough data yet, or if no scan has been classified beyond "Not a Scam"/"Unclassified".
+
+---
+
+### Connecting to the Live Flask Backend
+
+Create a `.env` file in the project root:
+
+```env
+VITE_API_URL= https://fraudlens-backend-uynu.onrender.com
+```
+
+When `VITE_API_URL` is set, `src/api.js` directs all requests above to that live backend. *(If your app also supports an offline/mock mode when this variable is unset, document that behavior here explicitly, including what data the mock returns — this keeps the contract accurate for anyone integrating without a live backend.)*
 
 ## 💻 Local Development
 

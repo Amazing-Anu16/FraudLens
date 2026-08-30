@@ -1,0 +1,6 @@
+Flask
+Flask-CORS
+gunicorn
+google-genai
+pymongo
+python-dotenv

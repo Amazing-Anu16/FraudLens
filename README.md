@@ -6,7 +6,7 @@ FraudLens is an AI-powered scam and phishing detection web application. Users pa
 
 ---
 ### 🌐 Live Website
-[SafeVerify](https://safeverify-frontend.vercel.app/)
+[FraudLens](https://safeverify-frontend.vercel.app/)
 
 ---
 

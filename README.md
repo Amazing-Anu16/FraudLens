@@ -8,10 +8,73 @@ FraudLens is an AI-powered scam and phishing detection web application. Users pa
 
 ## 🚀 Tech Stack
 
-- **Framework**: React 18 (Vite)
-- **Styling**: Vanilla / Plain CSS (Custom Dark Cybersecurity Design System)
-- **Typography**: Space Grotesk, Inter, JetBrains Mono
-- **Deployment**: Vercel-ready
+## 🛠️ Tech Stack
+
+![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-B73BFE?style=flat&logo=vite&logoColor=FFD62E)
+![Flask](https://img.shields.io/badge/Flask-000000?style=flat&logo=flask&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-47A248?style=flat&logo=mongodb&logoColor=white)
+![Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?style=flat&logo=googlegemini&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat&logo=vercel&logoColor=white)
+
+### Frontend
+| Technology | Purpose |
+|---|---|
+| **React** | Component-based UI (`App.jsx`, `Navbar.jsx`, `ErrorBanner.jsx`, `ExampleChips.jsx`) |
+| **Vite** | Dev server & build tool |
+| **CSS** | Styling (no framework — custom stylesheet) |
+| **npm** | Package management |
+
+### Backend
+| Technology | Purpose |
+|---|---|
+| **Python** | Core backend language |
+| **Flask** | REST API framework (`/api/analyze`, `/api/history`, `/api/stats`) |
+| **Flask-CORS** | Cross-origin request handling between frontend and API |
+| **Gunicorn** | Production WSGI server |
+| **python-dotenv** | Environment variable management (`.env`) |
+
+### AI / Machine Learning
+| Technology | Purpose |
+|---|---|
+| **Google Gemini API** (`google-genai`, model `gemini-3.5-flash`) | Primary scam/phishing risk analysis — returns structured risk score, category, red flags, and safety guidance |
+| **Custom rule-based engine** (regex heuristics, in `engine.py`) | Offline fallback analyzer that activates automatically if the Gemini API is unavailable or fails, so the app degrades gracefully instead of breaking |
+
+### Database
+| Technology | Purpose |
+|---|---|
+| **MongoDB** (via `pymongo`) | Stores every scan (`fraudlens.scans` collection) — powers scan history and aggregate stats (total scans, high-risk count, top scam category) |
+
+### Deployment
+| Technology | Purpose |
+|---|---|
+| **Vercel** | Frontend hosting (`vercel.json`) |
+
+### Tooling
+| Technology | Purpose |
+|---|---|
+| **Git & GitHub** | Version control |
+
+---
+
+### Architecture Overview
+
+```
+┌─────────────┐      REST API       ┌──────────────┐      ┌──────────────┐
+│   React     │ ──────────────────► │    Flask     │ ───► │  Google      │
+│  (Vite)     │ ◄────────────────── │   Backend    │      │  Gemini API  │
+└─────────────┘     JSON responses  └──────┬───────┘      └──────────────┘
+                                            │
+                                            │  (fallback if Gemini fails)
+                                            ▼
+                                     ┌──────────────┐      ┌──────────────┐
+                                     │  Rule-based  │      │   MongoDB    │
+                                     │   Engine     │      │  (scans DB)  │
+                                     └──────────────┘      └──────────────┘
+```
+
+**How it works:** the frontend sends message text to `/api/analyze`. The Flask backend calls the Gemini API first for AI-driven risk scoring; if that call fails or the API key is missing, it automatically falls back to a regex-based rule engine so the feature never fully breaks. Every result is logged to MongoDB, which also powers the `/api/history` and `/api/stats` endpoints for dashboard views.
 
 ---
 

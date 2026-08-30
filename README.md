@@ -36,13 +36,13 @@ FraudLens is an AI-powered scam and phishing detection web application. Users pa
 ### AI / Machine Learning
 | Technology | Purpose |
 |---|---|
-| **Google Gemini API** (`google-genai`, model `gemini-3.5-flash`) | Primary scam/phishing risk analysis — returns structured risk score, category, red flags, and safety guidance |
+| **Google Gemini API** (`google-genai`, model `gemini-3.5-flash`) | Primary scam/phishing risk analysis which returns structured risk score, category, red flags, and safety guidance |
 | **Custom rule-based engine** (regex heuristics, in `engine.py`) | Offline fallback analyzer that activates automatically if the Gemini API is unavailable or fails, so the app degrades gracefully instead of breaking |
 
 ### Database
 | Technology | Purpose |
 |---|---|
-| **MongoDB** (via `pymongo`) | Stores every scan (`fraudlens.scans` collection) — powers scan history and aggregate stats (total scans, high-risk count, top scam category) |
+| **MongoDB** (via `pymongo`) | Stores every scan (`fraudlens.scans` collection), powers scan history and aggregate stats (total scans, high-risk count, top scam category) |
 
 ### Deployment
 | Technology | Purpose |

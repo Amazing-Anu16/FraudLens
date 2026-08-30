@@ -1,4 +1,4 @@
-# FraudLens — Frontend
+# FraudLens
 
 > *"See the red flags before you take the risk."*
 

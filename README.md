@@ -1,12 +1,18 @@
-# FraudLens
+# 🛡️ FraudLens
 
 > *"See the red flags before you take the risk."*
 
 FraudLens is an AI-powered scam and phishing detection web application. Users paste suspicious messages (SMS, WhatsApp, email, or UPI payment text) and receive an explainable risk diagnostic report featuring calibrated threat scores, detected red flags, plain-English explanations, and two-column safety action playbooks (DO NOT vs DO).
 
 ---
-### 🌐 Live Website
-[FraudLens](https://safeverify-frontend.vercel.app/)
+## 🔗 Live Demo
+
+| Service | URL |
+|---|---|
+| **Frontend** | [https://safeverify.vercel.app](https://safeverify.vercel.app) |
+| **Backend API** | [https://fraudlens-backend-uynu.onrender.com](https://fraudlens-backend-uynu.onrender.com) |
+
+> ⚠️ The backend runs on Render's free tier — if it hasn't been used in the last 15 minutes, the first request may take 30–60 seconds to wake up.
 
 ---
 
@@ -57,6 +63,17 @@ FraudLens is an AI-powered scam and phishing detection web application. Users pa
 | Technology | Purpose |
 |---|---|
 | **Git & GitHub** | Version control |
+
+---
+## ✨ Features
+
+- **Explainable Risk Score (0–100)** with a clear risk level: `LOW` / `MODERATE` / `HIGH` / `CRITICAL`
+- **Scam Type Classification** — Banking Phishing, UPI/Payment Scam, Job Scam, Fake KYC, Prize/Lottery Scam, Investment Scam, Delivery Scam, and more
+- **Detected Red Flags** — specific, message-level signals (urgency language, credential requests, suspicious URLs, impersonation, etc.), not generic boilerplate
+- **"Why This Matters"** — a plain-English explanation grounded in the actual message content
+- **Recommended Safety Actions** — clear DO / DO-NOT guidance tailored to the specific scam type
+- **Scan History & Dashboard** — track total scans, high-risk counts, and top scam categories over time
+- **Resilient by design** — if the AI engine is ever unavailable, a rule-based fallback engine keeps the app working without ever showing a broken result
 
 ---
 
@@ -223,3 +240,37 @@ When `VITE_API_URL` is set, `src/api.js` directs all requests above to that live
    ```bash
    npm run build
    ```
+---
+## 🔒 Security Notes
+
+- API keys and database credentials are never committed to the repository — all secrets are managed via environment variables on Render and Vercel.
+- CORS is restricted to the deployed frontend origin in production.
+- The Gemini engine's output is validated and clamped server-side before being returned, so malformed AI responses never reach the client.
+
+---
+
+## 🚧 Known Limitations
+
+- Free-tier hosting means the backend may take up to a minute to "wake up" after inactivity.
+- Detection is based on message content only — it does not verify URLs against live threat-intelligence databases.
+- Currently supports English-language messages.
+
+---
+
+## 🔮 Future Scope
+
+- Browser extension for real-time inline scanning
+- WhatsApp bot integration
+- Community-reported scam pattern database
+- Multi-language support
+
+---
+## 👥 Team
+
+Built for a hackathon submission by [Shravani348](https://github.com/Shravani348) and [Anupriya Kundu](https://github.com/Amazing-Anu16).
+
+---
+
+## 📄 License
+
+This project was built for educational/competition purposes.

@@ -50,12 +50,214 @@ def get_risk_level(score):
 # Scam type
 # ---------------------------------------------------------
 
-def detect_scam_type(prediction):
+def detect_scam_type(prediction, message):
+    """
+    Provides a more specific scam category when scam-related
+    language is present in the message. The ML prediction still
+    determines whether the message is classified as a scam.
+    """
 
     if prediction == 0:
         return "Not a Scam"
 
+    message_lower = message.lower()
+
+    patterns = [
+        (
+            r"\b(prize|won|winner|lottery|reward|cashback|gift|voucher|free)\b",
+            "Reward / Prize Scam"
+        ),
+        (
+            r"\b(otp|one[- ]time password|pin|cvv|password|verification code|login|account details)\b",
+            "Credential / Account Scam"
+        ),
+        (
+            r"\b(upi|payment|pay|transfer|send money|refund|cash|bank)\b",
+            "Payment / Banking Scam"
+        ),
+        (
+            r"\b(job|vacancy|hiring|salary|work from home|employment|recruiter)\b",
+            "Job / Employment Scam"
+        ),
+        (
+            r"\b(delivery|parcel|package|courier|shipment|customs)\b",
+            "Delivery / Parcel Scam"
+        ),
+        (
+            r"\b(invest|investment|trading|crypto|bitcoin|profit|returns)\b",
+            "Investment Scam"
+        ),
+        (
+            r"\b(refund|tax|income tax|itr|penalty|fine)\b",
+            "Refund / Tax Scam"
+        ),
+        (
+            r"\b(virus|malware|technical support|tech support|computer|remote access)\b",
+            "Tech Support Scam"
+        ),
+        (
+            r"\b(expire|suspend|suspended|blocked|deactivate|deactivated|verify your account)\b",
+            "Account Suspension Scam"
+        ),
+    ]
+
+    for pattern, category in patterns:
+        if re.search(pattern, message_lower):
+            return category
+
     return "Scam"
+
+
+# ---------------------------------------------------------
+# Context-specific safety recommendations
+# ---------------------------------------------------------
+
+def get_safety_recommendations(message, prediction, score):
+    """
+    Generates safety recommendations based on the actual scam
+    context detected in the message. Strong recommendations are
+    activated when the risk score is above 40.
+    """
+
+    message_lower = message.lower()
+
+    if prediction == 0 or score is None or score <= 40:
+        return {
+            "do_not": [],
+            "do": [
+                "Verify unexpected requests through an official source before taking action"
+            ]
+        }
+
+    do_not = []
+    do_actions = []
+
+    # Reward / prize / cashback
+    if re.search(r"\b(prize|won|winner|lottery|reward|cashback|gift|voucher|free)\b", message_lower):
+        do_not.extend([
+            "Do not click the reward or prize link",
+            "Do not pay a fee to claim a reward",
+            "Do not share OTP, UPI PIN, card details, or bank information to receive a prize"
+        ])
+        do_actions.extend([
+            "Verify the offer directly through the company's official website or app",
+            "If you did not enter a contest, treat the reward claim as suspicious"
+        ])
+
+    # Banking / credentials
+    if re.search(r"\b(otp|one[- ]time password|pin|cvv|password|verification code|login|account details)\b", message_lower):
+        do_not.extend([
+            "Do not share OTP, PIN, CVV, password, or verification codes",
+            "Do not enter banking credentials through a message link"
+        ])
+        do_actions.extend([
+            "Open your bank's official app or website manually",
+            "Contact the bank using the phone number on its official website or card"
+        ])
+
+    # Payment / UPI
+    if re.search(r"\b(upi|payment|pay|transfer|send money|refund|cash|bank)\b", message_lower):
+        do_not.extend([
+            "Do not send money or approve an unexpected payment request",
+            "Do not scan an unknown QR code or enter your UPI PIN to receive money"
+        ])
+        do_actions.extend([
+            "Verify the payment request with the person or organization using a trusted channel",
+            "Review the recipient name and transaction details before approving any payment"
+        ])
+
+    # Job scam
+    if re.search(r"\b(job|vacancy|hiring|salary|work from home|employment|recruiter)\b", message_lower):
+        do_not.extend([
+            "Do not pay registration, training, security, or interview fees",
+            "Do not share identity or bank documents with an unverified recruiter"
+        ])
+        do_actions.extend([
+            "Verify the vacancy on the employer's official careers page",
+            "Confirm recruiter contact details through the company's official website"
+        ])
+
+    # Delivery / parcel scam
+    if re.search(r"\b(delivery|parcel|package|courier|shipment|customs)\b", message_lower):
+        do_not.extend([
+            "Do not click an unexpected parcel-tracking or customs payment link",
+            "Do not pay additional delivery fees through an unverified link"
+        ])
+        do_actions.extend([
+            "Track the shipment using the courier's official website or app",
+            "Contact the courier through its official customer-support channel"
+        ])
+
+    # Investment scam
+    if re.search(r"\b(invest|investment|trading|crypto|bitcoin|profit|returns)\b", message_lower):
+        do_not.extend([
+            "Do not transfer money based on guaranteed-profit claims",
+            "Do not share trading, wallet, or banking credentials with an unknown person"
+        ])
+        do_actions.extend([
+            "Verify the investment platform and company independently",
+            "Check regulatory registration before investing"
+        ])
+
+    # Refund / tax scam
+    if re.search(r"\b(refund|tax|income tax|itr|penalty|fine)\b", message_lower):
+        do_not.extend([
+            "Do not click links claiming to release a refund or avoid a penalty",
+            "Do not provide card, bank, or tax-account credentials through the message"
+        ])
+        do_actions.extend([
+            "Check your refund or tax status through the official government portal",
+            "Contact the relevant authority through its official contact details"
+        ])
+
+    # Tech support scam
+    if re.search(r"\b(virus|malware|technical support|tech support|computer|remote access)\b", message_lower):
+        do_not.extend([
+            "Do not install remote-access software at an unknown person's request",
+            "Do not give an unknown caller control of your computer"
+        ])
+        do_actions.extend([
+            "Use your device manufacturer's official support page",
+            "Run security checks using trusted security software"
+        ])
+
+    # Account suspension / verification
+    if re.search(r"\b(expire|suspend|suspended|blocked|deactivate|deactivated|verify your account)\b", message_lower):
+        do_not.extend([
+            "Do not click a link claiming your account will be blocked or suspended",
+            "Do not enter your login credentials on a page opened from the message"
+        ])
+        do_actions.extend([
+            "Open the service's official app or website manually to check your account",
+            "Contact official customer support if your account actually has an issue"
+        ])
+
+    # Any suspicious URL gets an explicit link warning.
+    if re.search(r"(http://|https://|www\.|bit\.ly|t\.co)", message_lower):
+        do_not.append("Do not click or open the suspicious URL in the message")
+        do_actions.append("Navigate to the official website manually instead of using the message link")
+
+    # Urgency is an additional signal, regardless of scam category.
+    if re.search(r"\b(urgent|immediately|now|hurry|expire|suspend|blocked)\b", message_lower):
+        do_not.append("Do not act under pressure or urgency created by the message")
+        do_actions.append("Pause and independently verify the request before taking any action")
+
+    # Fallback for a high-risk scam that does not match a known category.
+    if not do_not:
+        do_not = [
+            "Do not click links, send money, or share sensitive information based on this message"
+        ]
+
+    if not do_actions:
+        do_actions = [
+            "Verify the sender and request through an official, independently found channel"
+        ]
+
+    # Remove duplicate recommendations while preserving order.
+    return {
+        "do_not": list(dict.fromkeys(do_not)),
+        "do": list(dict.fromkeys(do_actions))
+    }
 
 
 # ---------------------------------------------------------
@@ -197,7 +399,7 @@ def analyze(message):
         risk_level = get_risk_level(risk_score)
 
         # Detect scam type
-        scam_type = detect_scam_type(prediction)
+        scam_type = detect_scam_type(prediction, message)
 
         # Generate red flags
         red_flags = get_red_flags(message)
@@ -209,29 +411,12 @@ def analyze(message):
             risk_score
         )
 
-        # Safety recommendations
-        if prediction == 1:
-
-            safety_actions = {
-                "do_not": [
-                    "Do not click suspicious links",
-                    "Do not share OTP, PIN, CVV, or passwords",
-                    "Do not send money based only on this message"
-                ],
-                "do": [
-                    "Verify the sender independently",
-                    "Check the organization's official website or app"
-                ]
-            }
-
-        else:
-
-            safety_actions = {
-                "do_not": [],
-                "do": [
-                    "Continue to verify unexpected requests before taking action"
-                ]
-            }
+        # Context-specific safety recommendations
+        safety_actions = get_safety_recommendations(
+            message,
+            prediction,
+            risk_score
+        )
 
         return {
             "risk_score": risk_score,

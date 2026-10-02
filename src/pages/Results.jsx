@@ -180,8 +180,12 @@ Source: FraudLens AI`;
       {/* Detected Red Flags Section */}
       <RedFlagList flags={data.red_flags} />
 
-      {/* Two-Column Safety Actions (DO NOT vs DO) */}
-      <SafetyActions safetyActions={data.safety_actions} />
+      {/* Context-Specific Safety Recommendations Section (DO NOT vs DO) */}
+      <SafetyActions 
+        safetyActions={data.safety_actions} 
+        scamType={data.scam_type}
+        riskLevel={data.risk_level}
+      />
 
       {/* Action Footer */}
       <div className="results-footer-actions">

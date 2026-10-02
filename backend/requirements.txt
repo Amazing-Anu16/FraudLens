@@ -1,6 +1,9 @@
 Flask
 Flask-CORS
+PyJWT
 gunicorn
 google-genai
 pymongo
 python-dotenv
+Werkzeug
+reportlab

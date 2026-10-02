@@ -69,6 +69,7 @@ if mongo_uri:
     # Collections
     users_collection = db.users
     scans_collection = db.scans
+    feedback_collection = db.feedback
 
 else:
     print(
@@ -78,6 +79,7 @@ else:
 
     users_collection = None
     scans_collection = None
+    feedback_collection = None
 
 
 # ============================================================
@@ -1236,4 +1238,132 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=port,
         debug=True
-    )
+    )# ============================================================
+# Prediction Feedback / Model Learning
+# ============================================================
+
+@app.route("/api/feedback", methods=["POST"])
+def submit_feedback():
+
+    payload, error_response = verify_token()
+
+    if error_response:
+        return error_response
+
+    try:
+        data = request.get_json() or {}
+
+        text = data.get("text")
+        feedback = data.get("feedback")
+        correct_label = data.get("correct_label")
+        predicted_label = data.get("predicted_label")
+        risk_score = data.get("risk_score")
+
+        if not isinstance(text, str) or not text.strip():
+            return jsonify({"error": "Message text is required"}), 400
+
+        if feedback not in ("correct", "wrong"):
+            return jsonify({
+                "error": "feedback must be 'correct' or 'wrong'"
+            }), 400
+
+        if feedback == "correct":
+            if predicted_label not in (0, 1):
+                return jsonify({
+                    "error": "predicted_label must be 0 or 1"
+                }), 400
+            correct_label = int(predicted_label)
+
+        else:
+            # A Wrong vote needs the user's actual classification so it can
+            # become a supervised training label.
+            if correct_label not in (0, 1):
+                return jsonify({
+                    "error": "For wrong predictions, correct_label must be 0 (not scam) or 1 (scam)"
+                }), 400
+            correct_label = int(correct_label)
+
+        if predicted_label not in (0, 1):
+            predicted_label = None
+        else:
+            predicted_label = int(predicted_label)
+
+        if risk_score is not None:
+            try:
+                risk_score = float(risk_score)
+            except (TypeError, ValueError):
+                risk_score = None
+
+        if feedback_collection is None:
+            return jsonify({
+                "error": "Database is not available"
+            }), 503
+
+        feedback_doc = {
+            "user_id": payload["user_id"],
+            "text": text.strip(),
+            "feedback": feedback,
+            "predicted_label": predicted_label,
+            "correct_label": correct_label,
+            "risk_score": risk_score,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+
+        feedback_collection.insert_one(feedback_doc)
+
+        # Train only from confirmed feedback. We use all feedback records
+        # because each record contains an explicit ground-truth label.
+        rows = list(
+            feedback_collection.find(
+                {},
+                {"text": 1, "correct_label": 1, "_id": 0}
+            )
+        )
+
+        training_result = engine.train_feedback_model(rows)
+
+        return jsonify({
+            "message": "Feedback recorded successfully",
+            "feedback": feedback,
+            "model_training": training_result
+        }), 201
+
+    except Exception as e:
+        print(f"Error in /api/feedback: {e}")
+        return jsonify({
+            "error": "Could not save feedback"
+        }), 500
+
+
+@app.route("/api/feedback/status", methods=["GET"])
+def feedback_status():
+
+    payload, error_response = verify_token()
+
+    if error_response:
+        return error_response
+
+    try:
+        total = 0
+        scam = 0
+        not_scam = 0
+
+        if feedback_collection is not None:
+            total = feedback_collection.count_documents({})
+            scam = feedback_collection.count_documents({"correct_label": 1})
+            not_scam = feedback_collection.count_documents({"correct_label": 0})
+
+        return jsonify({
+            "feedback_samples": total,
+            "scam_labels": scam,
+            "not_scam_labels": not_scam,
+            "feedback_model_active": (
+                engine.feedback_classifier is not None
+                and engine.feedback_sample_count >= engine.FEEDBACK_MIN_SAMPLES
+            ),
+            "minimum_samples": engine.FEEDBACK_MIN_SAMPLES
+        }), 200
+
+    except Exception as e:
+        print(f"Error in /api/feedback/status: {e}")
+        return jsonify({"error": "Could not fetch feedback status"}), 500

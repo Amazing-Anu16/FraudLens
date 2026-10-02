@@ -651,6 +651,574 @@ def get_stats():
         }), 500
 
 
+@app.route("/api/report", methods=["POST"])
+def generate_report():
+
+    # Verify JWT
+    payload, error_response = verify_token()
+
+    if error_response:
+        return error_response
+
+    try:
+        data = request.get_json()
+
+        if not data or "text" not in data:
+            return jsonify({
+                "error": "Missing 'text' in request body"
+            }), 400
+
+        text = data["text"]
+
+        if not isinstance(text, str):
+            return jsonify({
+                "error": "'text' must be a string"
+            }), 400
+
+        text = text.strip()
+
+        if not text:
+            return jsonify({
+                "error": "Text cannot be empty"
+            }), 400
+
+        if len(text) > 10000:
+            return jsonify({
+                "error": "Text is too long"
+            }), 400
+
+        # Run the existing FraudLens analysis engine
+        result = engine.analyze(text)
+
+        generated_at = datetime.now(timezone.utc)
+
+        # --------------------------------------------------
+        # PDF Styles
+        # --------------------------------------------------
+
+        styles = getSampleStyleSheet()
+
+        title_style = ParagraphStyle(
+            "ReportTitle",
+            parent=styles["Title"],
+            fontSize=22,
+            leading=26,
+            alignment=TA_CENTER,
+            spaceAfter=6
+        )
+
+        subtitle_style = ParagraphStyle(
+            "ReportSubtitle",
+            parent=styles["Normal"],
+            fontSize=9,
+            textColor=colors.HexColor("#667085"),
+            alignment=TA_CENTER,
+            spaceAfter=18
+        )
+
+        section_style = ParagraphStyle(
+            "SectionHeading",
+            parent=styles["Heading2"],
+            fontSize=13,
+            leading=16,
+            spaceBefore=12,
+            spaceAfter=7
+        )
+
+        body_style = ParagraphStyle(
+            "ReportBody",
+            parent=styles["BodyText"],
+            fontSize=9.5,
+            leading=14,
+            spaceAfter=6
+        )
+
+        small_style = ParagraphStyle(
+            "ReportSmall",
+            parent=styles["BodyText"],
+            fontSize=8,
+            leading=11,
+            textColor=colors.HexColor("#667085")
+        )
+
+        # Escape text before inserting it into ReportLab HTML-like markup
+        from xml.sax.saxutils import escape
+
+        def safe(value):
+            return escape(
+                str(value if value is not None else "")
+            )
+
+        # --------------------------------------------------
+        # Create PDF
+        # --------------------------------------------------
+
+        pdf_buffer = BytesIO()
+
+        document = SimpleDocTemplate(
+            pdf_buffer,
+            pagesize=A4,
+            rightMargin=18 * mm,
+            leftMargin=18 * mm,
+            topMargin=16 * mm,
+            bottomMargin=16 * mm,
+            title="FraudLens Scam Analysis Report",
+            author="FraudLens"
+        )
+
+        story = []
+
+        # Title
+        story.append(
+            Paragraph(
+                "FraudLens",
+                title_style
+            )
+        )
+
+        story.append(
+            Paragraph(
+                "Scam & Phishing Analysis Report",
+                subtitle_style
+            )
+        )
+
+        # --------------------------------------------------
+        # Summary
+        # --------------------------------------------------
+
+        summary_data = [
+            [
+                "Risk Score",
+                f"{result.get('risk_score', 'N/A')}/100"
+            ],
+            [
+                "Risk Level",
+                result.get("risk_level", "N/A")
+            ],
+            [
+                "Classification",
+                result.get("scam_type", "N/A")
+            ],
+            [
+                "Analysis Source",
+                result.get("source", "N/A")
+            ],
+            [
+                "Generated",
+                generated_at.strftime(
+                    "%d %B %Y, %H:%M UTC"
+                )
+            ]
+        ]
+
+        summary_table = Table(
+            summary_data,
+            colWidths=[
+                48 * mm,
+                115 * mm
+            ]
+        )
+
+        summary_table.setStyle(
+            TableStyle([
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (0, -1),
+                    colors.HexColor("#F2F4F7")
+                ),
+                (
+                    "FONTNAME",
+                    (0, 0),
+                    (0, -1),
+                    "Helvetica-Bold"
+                ),
+                (
+                    "FONTSIZE",
+                    (0, 0),
+                    (-1, -1),
+                    9
+                ),
+                (
+                    "GRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.4,
+                    colors.HexColor("#D0D5DD")
+                ),
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "MIDDLE"
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    7
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    7
+                ),
+                (
+                    "LEFTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    7
+                ),
+                (
+                    "RIGHTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    7
+                )
+            ])
+        )
+
+        story.append(summary_table)
+        story.append(Spacer(1, 10))
+
+        # --------------------------------------------------
+        # Original Message
+        # --------------------------------------------------
+
+        story.append(
+            Paragraph(
+                "Analyzed Message",
+                section_style
+            )
+        )
+
+        message_table = Table(
+            [[
+                Paragraph(
+                    safe(text),
+                    body_style
+                )
+            ]],
+            colWidths=[163 * mm]
+        )
+
+        message_table.setStyle(
+            TableStyle([
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (-1, -1),
+                    colors.HexColor("#F8FAFC")
+                ),
+                (
+                    "BOX",
+                    (0, 0),
+                    (-1, -1),
+                    0.5,
+                    colors.HexColor("#D0D5DD")
+                ),
+                (
+                    "LEFTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    9
+                ),
+                (
+                    "RIGHTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    9
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    9
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    9
+                )
+            ])
+        )
+
+        story.append(message_table)
+
+        # --------------------------------------------------
+        # Explanation
+        # --------------------------------------------------
+
+        story.append(
+            Paragraph(
+                "Why This Matters",
+                section_style
+            )
+        )
+
+        story.append(
+            Paragraph(
+                safe(
+                    result.get(
+                        "explanation",
+                        "No explanation available."
+                    )
+                ),
+                body_style
+            )
+        )
+
+        # --------------------------------------------------
+        # Red Flags
+        # --------------------------------------------------
+
+        story.append(
+            Paragraph(
+                "Detected Red Flags",
+                section_style
+            )
+        )
+
+        red_flags = result.get("red_flags") or []
+
+        if red_flags:
+
+            flag_rows = [
+                [
+                    Paragraph(
+                        f"• {safe(flag)}",
+                        body_style
+                    )
+                ]
+                for flag in red_flags
+            ]
+
+        else:
+
+            flag_rows = [[
+                Paragraph(
+                    "No specific red flags were detected.",
+                    body_style
+                )
+            ]]
+
+        flag_table = Table(
+            flag_rows,
+            colWidths=[163 * mm]
+        )
+
+        flag_table.setStyle(
+            TableStyle([
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (-1, -1),
+                    colors.HexColor("#FFF8F0")
+                ),
+                (
+                    "BOX",
+                    (0, 0),
+                    (-1, -1),
+                    0.4,
+                    colors.HexColor("#FED7AA")
+                ),
+                (
+                    "LEFTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    9
+                ),
+                (
+                    "RIGHTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    9
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    5
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    5
+                )
+            ])
+        )
+
+        story.append(flag_table)
+
+        # --------------------------------------------------
+        # Safety Recommendations
+        # --------------------------------------------------
+
+        story.append(
+            Paragraph(
+                "Safety Recommendations",
+                section_style
+            )
+        )
+
+        safety = result.get("safety_actions") or {}
+
+        do_not = safety.get("do_not") or []
+        do_items = safety.get("do") or []
+
+        safety_rows = [
+            [
+                Paragraph(
+                    "<b>Do Not</b>",
+                    body_style
+                ),
+                Paragraph(
+                    "<b>Do</b>",
+                    body_style
+                )
+            ],
+            [
+                Paragraph(
+                    "<br/>".join(
+                        f"• {safe(item)}"
+                        for item in do_not
+                    ) or "—",
+                    body_style
+                ),
+                Paragraph(
+                    "<br/>".join(
+                        f"• {safe(item)}"
+                        for item in do_items
+                    ) or "—",
+                    body_style
+                )
+            ]
+        ]
+
+        safety_table = Table(
+            safety_rows,
+            colWidths=[
+                81.5 * mm,
+                81.5 * mm
+            ]
+        )
+
+        safety_table.setStyle(
+            TableStyle([
+                (
+                    "BACKGROUND",
+                    (0, 0),
+                    (0, 0),
+                    colors.HexColor("#FEF2F2")
+                ),
+                (
+                    "BACKGROUND",
+                    (1, 0),
+                    (1, 0),
+                    colors.HexColor("#ECFDF3")
+                ),
+                (
+                    "BACKGROUND",
+                    (0, 1),
+                    (0, 1),
+                    colors.HexColor("#FFFBFA")
+                ),
+                (
+                    "BACKGROUND",
+                    (1, 1),
+                    (1, 1),
+                    colors.HexColor("#F6FEF9")
+                ),
+                (
+                    "BOX",
+                    (0, 0),
+                    (-1, -1),
+                    0.5,
+                    colors.HexColor("#D0D5DD")
+                ),
+                (
+                    "INNERGRID",
+                    (0, 0),
+                    (-1, -1),
+                    0.4,
+                    colors.HexColor("#D0D5DD")
+                ),
+                (
+                    "VALIGN",
+                    (0, 0),
+                    (-1, -1),
+                    "TOP"
+                ),
+                (
+                    "LEFTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    9
+                ),
+                (
+                    "RIGHTPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    9
+                ),
+                (
+                    "TOPPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    7
+                ),
+                (
+                    "BOTTOMPADDING",
+                    (0, 0),
+                    (-1, -1),
+                    7
+                )
+            ])
+        )
+
+        story.append(safety_table)
+
+        # --------------------------------------------------
+        # Disclaimer
+        # --------------------------------------------------
+
+        story.append(Spacer(1, 14))
+
+        story.append(
+            Paragraph(
+                "This report is generated automatically by FraudLens. "
+                "Risk scores are model estimates and should not be treated "
+                "as definitive proof that a message is fraudulent or legitimate. "
+                "Verify important requests through trusted official channels.",
+                small_style
+            )
+        )
+
+        # Generate PDF
+        document.build(story)
+
+        pdf_buffer.seek(0)
+
+        return send_file(
+            pdf_buffer,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="fraudlens-scam-analysis-report.pdf"
+        )
+
+    except Exception as e:
+
+        print(
+            f"Error in /api/report: {e}"
+        )
+
+        return jsonify({
+            "error": "Could not generate report"
+        }), 500
 # ============================================================
 # Start Flask Server
 # ============================================================

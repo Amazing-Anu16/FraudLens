@@ -11,29 +11,19 @@ import SafetyActions from '../components/SafetyActions';
 export default function Results({ analysisData, originalText, onScanAgain }) {
   const [copied, setCopied] = useState(false);
 
-  // Fallback safe values if opened directly
-  const data = analysisData || {
-    risk_score: 95,
-    risk_level: "CRITICAL",
-    scam_type: "Banking Phishing",
-    red_flags: [
-      "Urgent threat of account suspension within 24 hours",
-      "Shortened suspicious URL (bit.ly)",
-      "Unsolicited request for sensitive PAN and banking credentials"
-    ],
-    explanation: "This message uses urgent psychological pressure and fake account suspension threats to trick you into entering banking credentials on a phishing clone page.",
-    safety_actions: {
-      do_not: [
-        "Do not click on the link or download any attachments",
-        "Do not share OTP, PIN, NetBanking password, or PAN details"
-      ],
-      do: [
-        "Log into your official banking mobile app directly to check alerts",
-        "Forward this SMS to 1930 (National Cyber Crime Helpline)"
-      ]
-    },
-    source: "llm"
-  };
+  if (!analysisData) {
+    return (
+      <div className="results-page" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '4rem 2rem' }}>
+        <h2 style={{ marginBottom: '1rem' }}>No Analysis Data Available</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Please scan a message first to see the analysis results.</p>
+        <button className="btn btn-primary" onClick={onScanAgain}>
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  const data = analysisData;
 
   const handleCopySummary = () => {
     const textToCopy = `FraudLens Threat Report:

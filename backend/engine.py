@@ -1,143 +1,263 @@
 import os
-import json
 import re
-from dotenv import load_dotenv
-from google import genai
-from google.genai import types
+import joblib
 
-load_dotenv(override=True)
+
+# ---------------------------------------------------------
+# Load ML model
+# ---------------------------------------------------------
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+MODEL_DIR = os.path.join(BASE_DIR, "ml", "models")
+
+TFIDF_PATH = os.path.join(
+    MODEL_DIR,
+    "tfidf_vectorizer_v2.pkl"
+)
+
+MODEL_PATH = os.path.join(
+    MODEL_DIR,
+    "calibrated_svm_v2.pkl"
+)
+
+
+tfidf_vectorizer_v2 = joblib.load(TFIDF_PATH)
+calibrated_svm_v2 = joblib.load(MODEL_PATH)
+
+
+# ---------------------------------------------------------
+# Risk level
+# ---------------------------------------------------------
+
 def get_risk_level(score):
     """Maps a risk score to a risk level category."""
+
     if score <= 30:
         return "LOW"
+
     elif score <= 60:
         return "MODERATE"
+
     elif score <= 85:
         return "HIGH"
+
     else:
         return "CRITICAL"
 
 
-def analyze(message):
-    """
-    Analyzes a message using Gemini. Falls back to rule-based engine
-    if the API fails, times out, or returns invalid JSON.
-    """
-    try:
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            print("Warning: GEMINI_API_KEY not set. Using fallback rules.")
-            return _rules_fallback(message)
+# ---------------------------------------------------------
+# Scam type
+# ---------------------------------------------------------
 
-        client = genai.Client(api_key=api_key)
+def detect_scam_type(prediction):
 
-        prompt = f"""
-        You are a highly advanced scam detection AI. Analyze the following user message to determine if it is a scam, phishing attempt, or malicious.
-        Categories to detect: urgency/threat language, OTP/PIN/credential requests, payment/UPI requests, suspicious URLs, reward/lottery language, impersonation of banks/companies/govt.
-        A normal benign message (e.g. a real OTP notice that does NOT ask the user to share it) should score LOW, not high.
-        
-        Output MUST be valid JSON matching this exact structure, with no extra text or markdown formatting:
-        {{
-          "risk_score": <number 0-100>,
-          "risk_level": "<LOW | MODERATE | HIGH | CRITICAL>",
-          "scam_type": "<e.g. Banking Phishing, UPI/Payment Scam, Job Scam, Fake KYC, Prize/Lottery Scam, Investment Scam, Delivery Scam, Not a Scam, Unclassified>",
-          "red_flags": ["<3-6 short strings specific to the text, NEVER generic>"],
-          "explanation": "<1-2 sentence string referencing concrete details from the message>",
-          "safety_actions": {{
-            "do_not": ["<strings>"],
-            "do": ["<strings>"]
-          }},
-          "source": "llm"
-        }}
-        
-        User Message to Analyze:
-        '''{message}'''
-        """
+    if prediction == 0:
+        return "Not a Scam"
 
-        response = client.models.generate_content(
-            model="gemini-3.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-            ),
+    return "Scam"
+
+
+# ---------------------------------------------------------
+# Generate explanation
+# ---------------------------------------------------------
+
+def generate_explanation(message, prediction, score):
+
+    if prediction == 0:
+
+        return (
+            f"The message was classified as likely legitimate "
+            f"with an estimated scam risk of {score:.2f}/100."
         )
 
-        # Parse the JSON response
-        data = json.loads(response.text)
-
-        # Validate and clamp score to 0-100
-        score = max(0, min(100, int(data.get("risk_score", 0))))
-        data["risk_score"] = score
-
-        # Ensure risk_level exactly matches the score thresholds
-        data["risk_level"] = get_risk_level(score)
-
-        # Ensure all required fields are present with sensible defaults if missing
-        data["scam_type"] = data.get("scam_type", "Unclassified")
-        data["red_flags"] = data.get("red_flags", [])
-        data["explanation"] = data.get("explanation", "No explanation provided.")
-        data["safety_actions"] = data.get("safety_actions", {"do": [], "do_not": []})
-        data["source"] = "llm"
-
-        return data
-
-    except Exception as e:
-        import traceback
-        print("========== GEMINI ERROR ==========")
-        print(e)
-        traceback.print_exc()
-        print("==================================")
-        return _rules_fallback(message)
-
-
-def _rules_fallback(message):
-    """
-    Rule-based fallback engine that activates if the Gemini call fails.
-    """
-    message_lower = message.lower()
-    score = 0
     flags = []
 
-    # Simple heuristic rules
-    if re.search(r'\b(urgent|immediate|suspend|block|blocked)\b', message_lower):
-        score += 30
-        flags.append("Urgency or threat language detected")
+    message_lower = message.lower()
 
-    if re.search(r'\b(otp|pin|password|cvv)\b', message_lower):
-        score += 40
-        flags.append("Requests sensitive credentials (OTP/PIN)")
+    if re.search(
+        r"\b(urgent|immediately|now|hurry|expire|suspend|blocked)\b",
+        message_lower
+    ):
+        flags.append("urgency or pressure language")
 
-    if re.search(r'\b(pay|upi|transfer|money|cashback|lottery|prize|won|winning)\b', message_lower):
-        score += 30
-        flags.append("Payment, UPI, or reward related language")
+    if re.search(
+        r"\b(otp|pin|password|cvv|verification code)\b",
+        message_lower
+    ):
+        flags.append("sensitive credential references")
 
-    if re.search(r'(http://|https://|www\.|bit\.ly|t\.co)', message_lower):
-        score += 20
-        flags.append("Contains a suspicious link/URL")
+    if re.search(
+        r"\b(pay|payment|upi|transfer|money|cashback)\b",
+        message_lower
+    ):
+        flags.append("payment-related language")
 
-    if re.search(r'\b(bank|account|kyc|amazon|flipkart|jio)\b', message_lower):
-        score += 15
-        flags.append("Mentions banks or large companies (potential impersonation)")
+    if re.search(
+        r"\b(prize|won|winner|lottery|reward|free)\b",
+        message_lower
+    ):
+        flags.append("reward or prize language")
 
-    # Clamp score
-    score = max(0, min(100, score))
+    if re.search(
+        r"(http://|https://|www\.|bit\.ly|t\.co)",
+        message_lower
+    ):
+        flags.append("URL/link detected")
 
-    # Determine scam type based on score
-    scam_type = "Unclassified"
-    if score >= 60:
-        scam_type = "Potential Phishing/Scam"
-    elif score <= 30:
-        scam_type = "Not a Scam"
+    if flags:
 
-    return {
-        "risk_score": score,
-        "risk_level": get_risk_level(score),
-        "scam_type": scam_type,
-        "red_flags": flags,
-        "explanation": "Analyzed using offline fallback rules due to system overload.",
-        "safety_actions": {
-            "do_not": ["Click any links or share OTPs"] if score > 30 else [],
-            "do": ["Verify the sender independently"]
-        },
-        "source": "rules_fallback"
-    }
+        return (
+            "The message was classified as a potential scam based on "
+            + ", ".join(flags)
+            + f". Estimated scam risk is {score:.2f}/100."
+        )
+
+    return (
+        f"The message was classified as a potential scam with "
+        f"an estimated scam risk of {score:.2f}/100."
+    )
+
+
+# ---------------------------------------------------------
+# Red flags
+# ---------------------------------------------------------
+
+def get_red_flags(message):
+
+    message_lower = message.lower()
+
+    flags = []
+
+    if re.search(
+        r"\b(urgent|immediately|now|hurry|expire|suspend|blocked)\b",
+        message_lower
+    ):
+        flags.append("Urgency or pressure language detected")
+
+    if re.search(
+        r"\b(otp|pin|password|cvv|verification code)\b",
+        message_lower
+    ):
+        flags.append("Sensitive credential reference detected")
+
+    if re.search(
+        r"\b(pay|payment|upi|transfer|money|cashback)\b",
+        message_lower
+    ):
+        flags.append("Payment-related language detected")
+
+    if re.search(
+        r"\b(prize|won|winner|lottery|reward|free)\b",
+        message_lower
+    ):
+        flags.append("Reward or prize language detected")
+
+    if re.search(
+        r"(http://|https://|www\.|bit\.ly|t\.co)",
+        message_lower
+    ):
+        flags.append("URL or link detected")
+
+    return flags
+
+
+# ---------------------------------------------------------
+# Main ML analysis
+# ---------------------------------------------------------
+
+def analyze(message):
+    """
+    Analyze SMS using the trained TF-IDF + calibrated SVM model.
+    """
+
+    try:
+
+        # Convert message into TF-IDF features
+        message_tfidf = tfidf_vectorizer_v2.transform([message])
+
+        # Prediction
+        prediction = calibrated_svm_v2.predict(message_tfidf)[0]
+
+        # Probability of scam
+        scam_probability = calibrated_svm_v2.predict_proba(
+            message_tfidf
+        )[0][1]
+
+        # Convert probability to 0-100 risk score
+        risk_score = round(
+            scam_probability * 100,
+            2
+        )
+
+        # ML prediction
+        prediction = int(prediction)
+
+        # Determine risk level
+        risk_level = get_risk_level(risk_score)
+
+        # Detect scam type
+        scam_type = detect_scam_type(prediction)
+
+        # Generate red flags
+        red_flags = get_red_flags(message)
+
+        # Generate explanation
+        explanation = generate_explanation(
+            message,
+            prediction,
+            risk_score
+        )
+
+        # Safety recommendations
+        if prediction == 1:
+
+            safety_actions = {
+                "do_not": [
+                    "Do not click suspicious links",
+                    "Do not share OTP, PIN, CVV, or passwords",
+                    "Do not send money based only on this message"
+                ],
+                "do": [
+                    "Verify the sender independently",
+                    "Check the organization's official website or app"
+                ]
+            }
+
+        else:
+
+            safety_actions = {
+                "do_not": [],
+                "do": [
+                    "Continue to verify unexpected requests before taking action"
+                ]
+            }
+
+        return {
+            "risk_score": risk_score,
+            "risk_level": risk_level,
+            "scam_type": scam_type,
+            "red_flags": red_flags,
+            "explanation": explanation,
+            "safety_actions": safety_actions,
+            "source": "ml_model_v2"
+        }
+
+    except Exception as e:
+
+        print("========== ML MODEL ERROR ==========")
+        print(e)
+        print("====================================")
+
+        return {
+            "risk_score": None,
+            "risk_level": "ERROR",
+            "scam_type": "Unclassified",
+            "red_flags": [],
+            "explanation": "The ML model could not analyze this message.",
+            "safety_actions": {
+                "do_not": [],
+                "do": []
+            },
+            "source": "ml_error"
+        }

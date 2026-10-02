@@ -7,7 +7,7 @@ import { getHistory, getStats } from '../api';
  * Dashboard & History Page (Priority 4)
  * Shows global threat stats and chronological recent scan records with rich empty and loading states.
  */
-export default function Dashboard({ onSelectScan, onNewScan }) {
+export default function Dashboard({ onSelectScan, onNewScan, onAuthError }) {
   const [history, setHistory] = useState([]);
   const [stats, setStats] = useState({ total_scans: 0, high_risk: 0, top_category: null });
   const [isLoading, setIsLoading] = useState(true);
@@ -23,13 +23,17 @@ export default function Dashboard({ onSelectScan, onNewScan }) {
         setHistory(historyData || []);
         setStats(statsData || { total_scans: 0, high_risk: 0, top_category: null });
       } catch (err) {
-        console.error("Failed to load dashboard data:", err);
+        if (err.status === 401 && onAuthError) {
+          onAuthError(err);
+        } else {
+          console.error("Failed to load dashboard data:", err);
+        }
       } finally {
         setIsLoading(false);
       }
     }
     loadData();
-  }, []);
+  }, [onAuthError]);
 
   const formatTimestamp = (isoString) => {
     if (!isoString) return 'Just now';

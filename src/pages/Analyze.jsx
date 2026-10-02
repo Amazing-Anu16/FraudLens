@@ -7,7 +7,7 @@ import { analyzeMessage } from '../api';
  * Analyze Page (Priority 1)
  * The main input screen for pasting messages, testing realistic samples, and triggering analysis.
  */
-export default function Analyze({ onAnalysisComplete }) {
+export default function Analyze({ onAnalysisComplete, onAuthError }) {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -38,7 +38,11 @@ export default function Analyze({ onAnalysisComplete }) {
         onAnalysisComplete(result, inputText);
       }
     } catch (err) {
-      setErrorMessage(err.message || 'Failed to analyze the message. Please try again.');
+      if (err.status === 401 && onAuthError) {
+        onAuthError(err);
+      } else {
+        setErrorMessage(err.message || 'Failed to analyze the message. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

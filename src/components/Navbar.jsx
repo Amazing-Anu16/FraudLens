@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Navbar component with glowing cybersecurity shield logo, page links, and live backend indicator.
  */
-export default function Navbar({ activePage, onNavigate }) {
+export default function Navbar({ activePage, onNavigate, isAuthenticated, user, onLogout }) {
   const isLiveBackend = Boolean(import.meta.env.VITE_API_URL);
 
   return (
@@ -43,6 +43,39 @@ export default function Navbar({ activePage, onNavigate }) {
           >
             Threat Intel
           </button>
+
+          <div style={{ width: '1px', height: '24px', backgroundColor: 'rgba(255,255,255,0.2)', margin: '0 0.5rem' }}></div>
+
+          {!isAuthenticated ? (
+            <>
+              <button
+                className={`nav-link ${activePage === 'login' ? 'active' : ''}`}
+                onClick={() => onNavigate('login')}
+              >
+                Login
+              </button>
+              <button
+                className={`nav-link ${activePage === 'signup' ? 'active' : ''}`}
+                onClick={() => onNavigate('signup')}
+                style={{ color: 'var(--teal-primary)', fontWeight: '600' }}
+              >
+                Sign Up
+              </button>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginRight: '0.5rem' }}>
+                {user?.email}
+              </span>
+              <button
+                className="nav-link"
+                onClick={onLogout}
+                style={{ color: 'var(--red-primary)' }}
+              >
+                Logout
+              </button>
+            </>
+          )}
 
           <div className="backend-pill" title={isLiveBackend ? `Connected to ${import.meta.env.VITE_API_URL}` : 'Running on Mock Engine'}>
             <span className="backend-dot" style={{ background: isLiveBackend ? '#22C55E' : '#00D9C0' }} />

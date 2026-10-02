@@ -1,0 +1,23 @@
+{
+    "model_version": "FraudLens V2",
+    "classifier": "Calibrated Linear SVM",
+    "vectorizer": "TF-IDF",
+    "ngram_range": [
+        1,
+        2
+    ],
+    "min_df": 2,
+    "max_df": 0.95,
+    "sublinear_tf": true,
+    "classes": {
+        "0": "Legitimate",
+        "1": "Scam"
+    },
+    "training_samples": 8494,
+    "test_samples": 2124,
+    "accuracy": 0.9863,
+    "precision": 0.9702,
+    "recall": 0.9841,
+    "f1_score": 0.9771,
+    "brier_score": 0.0112
+}

@@ -3,13 +3,18 @@ import ScoreGauge from '../components/ScoreGauge';
 import RiskBadge from '../components/RiskBadge';
 import RedFlagList from '../components/RedFlagList';
 import SafetyActions from '../components/SafetyActions';
+import ErrorBanner from '../components/ErrorBanner';
+import { downloadReport } from '../api';
 
 /**
  * Results Page (Priority 2 - Most Important Screen)
  * Displays full explainable scam diagnostic report matching the API contract.
  */
-export default function Results({ analysisData, originalText, onScanAgain }) {
+export default function Results({ analysisData, originalText, onScanAgain, onAuthError }) {
   const [copied, setCopied] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
+  const [downloadError, setDownloadError] = useState(null);
 
   if (!analysisData) {
     return (
@@ -24,6 +29,7 @@ export default function Results({ analysisData, originalText, onScanAgain }) {
   }
 
   const data = analysisData;
+  const messageText = originalText || data.raw_text || data.text || '';
 
   const handleCopySummary = () => {
     const textToCopy = `FraudLens Threat Report:
@@ -37,8 +43,38 @@ Source: FraudLens AI`;
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleDownloadReport = async () => {
+    if (!messageText) {
+      setDownloadError("No message content available to generate a report.");
+      return;
+    }
+
+    setIsDownloading(true);
+    setDownloadError(null);
+    try {
+      await downloadReport(messageText);
+      setDownloaded(true);
+      setTimeout(() => setDownloaded(false), 3000);
+    } catch (err) {
+      if (err.status === 401 && onAuthError) {
+        onAuthError(err);
+      } else {
+        setDownloadError(err.message || "Failed to download scam analysis report.");
+      }
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="results-page">
+      {downloadError && (
+        <ErrorBanner 
+          message={downloadError} 
+          onDismiss={() => setDownloadError(null)} 
+        />
+      )}
+
       {/* Header with Scam Type & Navigation */}
       <div className="results-header">
         <div>
@@ -46,7 +82,7 @@ Source: FraudLens AI`;
             <span className="scam-pill">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--teal-primary)" strokeWidth="2.5">
                 <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12"/>
                 <line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
               {data.scam_type || 'Unclassified Threat'}
@@ -60,13 +96,46 @@ Source: FraudLens AI`;
           <h1 className="page-title" style={{ fontSize: '1.85rem' }}>Threat Assessment Report</h1>
         </div>
 
-        <button className="btn btn-secondary" onClick={onScanAgain}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="1 4 1 10 7 10"/>
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-          </svg>
-          Scan Another Message
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button 
+            id="download-report-header-btn"
+            className="btn btn-download" 
+            onClick={handleDownloadReport}
+            disabled={isDownloading}
+            title="Download full PDF scam analysis report"
+          >
+            {isDownloading ? (
+              <>
+                <span className="spinner-teal" />
+                Generating PDF...
+              </>
+            ) : downloaded ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Report Downloaded
+              </>
+            ) : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download PDF Report
+              </>
+            )}
+          </button>
+
+          <button className="btn btn-secondary" onClick={onScanAgain}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10"/>
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+            </svg>
+            Scan Another Message
+          </button>
+        </div>
       </div>
 
       {/* Top Grid: Circular Score Gauge + "Why This Matters" Explanation Card */}
@@ -85,7 +154,7 @@ Source: FraudLens AI`;
             <div className="explanation-title">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12"/>
                 <line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
               Why This Matters
@@ -95,13 +164,13 @@ Source: FraudLens AI`;
             </p>
           </div>
 
-          {originalText && (
+          {messageText && (
             <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
                 Analyzed Message Snippet:
               </span>
               <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.3rem', fontStyle: 'italic' }}>
-                "{originalText.length > 180 ? originalText.slice(0, 180) + '...' : originalText}"
+                "{messageText.length > 180 ? messageText.slice(0, 180) + '...' : messageText}"
               </p>
             </div>
           )}
@@ -116,6 +185,36 @@ Source: FraudLens AI`;
 
       {/* Action Footer */}
       <div className="results-footer-actions">
+        <button 
+          id="download-report-btn" 
+          className="btn btn-download" 
+          onClick={handleDownloadReport}
+          disabled={isDownloading}
+        >
+          {isDownloading ? (
+            <>
+              <span className="spinner-teal" />
+              Generating Report...
+            </>
+          ) : downloaded ? (
+            <>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Report Downloaded!
+            </>
+          ) : (
+            <>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Download Scam Analysis Report
+            </>
+          )}
+        </button>
+
         <button id="scan-again-btn" className="btn btn-primary" onClick={onScanAgain}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="23 4 23 10 17 10"/>

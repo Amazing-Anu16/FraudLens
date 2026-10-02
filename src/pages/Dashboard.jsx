@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import StatCard from '../components/StatCard';
 import RiskBadge from '../components/RiskBadge';
-import { getHistory, getStats } from '../api';
+import { getHistory, getStats, downloadReport } from '../api';
 
 /**
  * Dashboard & History Page (Priority 4)
@@ -11,6 +11,7 @@ export default function Dashboard({ onSelectScan, onNewScan, onAuthError }) {
   const [history, setHistory] = useState([]);
   const [stats, setStats] = useState({ total_scans: 0, high_risk: 0, top_category: null });
   const [isLoading, setIsLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState(null);
 
   useEffect(() => {
     async function loadData() {
@@ -34,6 +35,23 @@ export default function Dashboard({ onSelectScan, onNewScan, onAuthError }) {
     }
     loadData();
   }, [onAuthError]);
+
+  const handleDownloadRow = async (e, item) => {
+    e.stopPropagation();
+    if (!item.text) return;
+    setDownloadingId(item._id);
+    try {
+      await downloadReport(item.text);
+    } catch (err) {
+      if (err.status === 401 && onAuthError) {
+        onAuthError(err);
+      } else {
+        alert(err.message || "Could not download report.");
+      }
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const formatTimestamp = (isoString) => {
     if (!isoString) return 'Just now';
@@ -144,6 +162,7 @@ export default function Dashboard({ onSelectScan, onNewScan, onAuthError }) {
                 <th>Scam Type</th>
                 <th>Risk Score</th>
                 <th>Scanned Time</th>
+                <th style={{ textAlign: 'center' }}>Report</th>
               </tr>
             </thead>
             <tbody>
@@ -155,7 +174,7 @@ export default function Dashboard({ onSelectScan, onNewScan, onAuthError }) {
                   title="Click to view details"
                 >
                   <td>
-                    <div className="text-truncate" style={{ maxWidth: '340px' }}>
+                    <div className="text-truncate" style={{ maxWidth: '300px' }}>
                       {item.text}
                     </div>
                   </td>
@@ -180,6 +199,25 @@ export default function Dashboard({ onSelectScan, onNewScan, onAuthError }) {
                   <td>
                     <span className="history-timestamp">{formatTimestamp(item.created_at)}</span>
                   </td>
+                  <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                    <button
+                      className="btn-icon-download"
+                      onClick={(e) => handleDownloadRow(e, item)}
+                      disabled={downloadingId === item._id}
+                      title="Download PDF report for this scan"
+                    >
+                      {downloadingId === item._id ? (
+                        <span className="spinner-teal" style={{ width: '12px', height: '12px', borderWidth: '1.5px' }} />
+                      ) : (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                          <polyline points="7 10 12 15 17 10"/>
+                          <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                      )}
+                      PDF
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -189,3 +227,4 @@ export default function Dashboard({ onSelectScan, onNewScan, onAuthError }) {
     </div>
   );
 }
+

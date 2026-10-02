@@ -278,6 +278,64 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--teal-primary);
 }
 
+.btn-download {
+  background: linear-gradient(135deg, rgba(0, 217, 192, 0.15) 0%, rgba(0, 191, 171, 0.08) 100%);
+  border: 1px solid var(--teal-primary);
+  color: var(--teal-primary);
+  box-shadow: 0 0 15px rgba(0, 217, 192, 0.15);
+}
+
+.btn-download:hover:not(:disabled) {
+  background: var(--teal-primary);
+  color: #05131A;
+  box-shadow: 0 0 25px var(--teal-glow);
+  transform: translateY(-1px);
+}
+
+.btn-download:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-icon-download {
+  background: rgba(0, 217, 192, 0.08);
+  border: 1px solid rgba(0, 217, 192, 0.3);
+  color: var(--teal-primary);
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-heading);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-icon-download:hover:not(:disabled) {
+  background: var(--teal-primary);
+  color: #05131A;
+  border-color: var(--teal-primary);
+  box-shadow: 0 0 12px var(--teal-glow);
+}
+
+.btn-icon-download:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinner-teal {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 217, 192, 0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+  display: inline-block;
+}
+
 /* Form Elements */
 .textarea-wrapper {
   position: relative;

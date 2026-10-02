@@ -142,6 +142,7 @@ export default function App() {
             analysisData={analysisResult}
             originalText={analyzedText}
             onScanAgain={handleScanAgain}
+            onAuthError={handleAuthError}
           />
         )}
 
